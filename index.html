@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Consulta de CEP</title>
+  <style>
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      background: #f1f5f9;
+      color: #0f172a;
+      font-family: system-ui, sans-serif;
+    }
+
+    main {
+      width: min(100%, 520px);
+      padding: 32px;
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 12px 32px #0f172a14;
+    }
+
+    h1 { margin-top: 0; }
+
+    form {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+
+    input, button {
+      min-height: 46px;
+      border-radius: 8px;
+      font: inherit;
+    }
+
+    input {
+      flex: 1;
+      min-width: 0;
+      padding: 0 12px;
+      border: 1px solid #cbd5e1;
+    }
+
+    button {
+      padding: 0 18px;
+      border: 0;
+      background: #2563eb;
+      color: white;
+      cursor: pointer;
+    }
+
+    button:hover { background: #1d4ed8; }
+    button:disabled { opacity: 0.6; cursor: wait; }
+
+    #mensagem { min-height: 24px; color: #475569; }
+    #mensagem.erro { color: #b91c1c; }
+
+    .resultado {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 0;
+    }
+
+    .resultado div { min-width: 0; }
+    .resultado .completo { grid-column: 1 / -1; }
+    dt { color: #64748b; font-size: 0.85rem; }
+    dd { margin: 4px 0 0; overflow-wrap: anywhere; }
+
+    @media (max-width: 420px) {
+      main { padding: 24px; }
+      form { flex-direction: column; }
+      .resultado { grid-template-columns: 1fr; }
+      .resultado .completo { grid-column: auto; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Consulta de CEP</h1>
+    <p>Digite um CEP brasileiro para encontrar o endereço.</p>
+
+    <form id="formulario">
+      <input
+        id="cep"
+        name="cep"
+        type="text"
+        inputmode="numeric"
+        autocomplete="postal-code"
+        placeholder="Ex.: 01001-000"
+        aria-label="CEP"
+        maxlength="9"
+        required
+      >
+      <button id="botao" type="submit">Consultar</button>
+    </form>
+
+    <p id="mensagem" role="status" aria-live="polite"></p>
+
+    <dl id="resultado" class="resultado" hidden>
+      <div>
+        <dt>CEP</dt>
+        <dd id="r-cep"></dd>
+      </div>
+      <div>
+        <dt>UF</dt>
+        <dd id="r-uf"></dd>
+      </div>
+      <div class="completo">
+        <dt>Logradouro</dt>
+        <dd id="r-logradouro"></dd>
+      </div>
+      <div>
+        <dt>Bairro</dt>
+        <dd id="r-bairro"></dd>
+      </div>
+      <div class="completo">
+        <dt>Cidade</dt>
+        <dd id="r-cidade"></dd>
+      </div>
+      <div class="completo">
+        <dt>Complemento</dt>
+        <dd id="r-complemento"></dd>
+      </div>
+    </dl>
+  </main>
+
+  <script>
+    const formulario = document.querySelector("#formulario");
+    const campoCep = document.querySelector("#cep");
+    const botao = document.querySelector("#botao");
+    const mensagem = document.querySelector("#mensagem");
+    const resultado = document.querySelector("#resultado");
+
+    formulario.addEventListener("submit", async (evento) => {
+      evento.preventDefault();
+
+      const cep = campoCep.value.replace(/\D/g, "");
+      resultado.hidden = true;
+      mensagem.classList.remove("erro");
+
+      if (cep.length !== 8) {
+        mensagem.textContent = "Informe um CEP válido com 8 números.";
+        mensagem.classList.add("erro");
+        campoCep.focus();
+        return;
+      }
+
+      botao.disabled = true;
+      mensagem.textContent = "Consultando…";
+
+      try {
+        const resposta = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
+
+        if (!resposta.ok) {
+          throw new Error("Não foi possível consultar o CEP agora.");
+        }
+
+        const dados = await resposta.json();
+
+        if (dados.erro) {
+          mensagem.textContent = "CEP não encontrado.";
+          mensagem.classList.add("erro");
+          return;
+        }
+
+        document.querySelector("#r-cep").textContent = dados.cep || "—";
+        document.querySelector("#r-uf").textContent = dados.uf || "—";
+        document.querySelector("#r-logradouro").textContent = dados.logradouro || "—";
+        document.querySelector("#r-bairro").textContent = dados.bairro || "—";
+        document.querySelector("#r-cidade").textContent =
+          [dados.localidade, dados.uf].filter(Boolean).join(" / ") || "—";
+        document.querySelector("#r-complemento").textContent = dados.complemento || "—";
+
+        resultado.hidden = false;
+        mensagem.textContent = "Endereço encontrado.";
+      } catch (erro) {
+        mensagem.textContent = erro.message || "Erro ao consultar o CEP.";
+        mensagem.classList.add("erro");
+      } finally {
+        botao.disabled = false;
+      }
+    });
+
+    campoCep.addEventListener("input", () => {
+      const numeros = campoCep.value.replace(/\D/g, "").slice(0, 8);
+      campoCep.value = numeros.length > 5
+        ? `${numeros.slice(0, 5)}-${numeros.slice(5)}`
+        : numeros;
+    });
+  </script>
+</body>
+</html>
